@@ -5,14 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 )
 
-const remote_service = "https://example.com/api" // Replace with actual URL
-
 type User struct {
-	ID    string `json:"id,omitempty"`
-	Name  string `json:"name"`
-	Email string `json:"email"`
+	ID   string `json:"id,omitempty"`
+	Name string `json:"name"`
+	Age  int    `json:"age"`
 }
 
 type UserClient interface {
@@ -26,9 +25,10 @@ type userClient struct {
 	client  *http.Client
 }
 
-func NewUserClient() UserClient {
+// NewClient creates a new user API client.
+func NewClient(remoteService string) UserClient {
 	return &userClient{
-		baseURL: remote_service,
+		baseURL: remoteService,
 		client:  &http.Client{},
 	}
 }
@@ -38,7 +38,19 @@ func (u *userClient) CreateUser(user *User) (*User, error) {
 	if err != nil {
 		return nil, err
 	}
-	resp, err := u.client.Post(fmt.Sprintf("%s/users", u.baseURL), "application/json", bytes.NewReader(body))
+	var resp *http.Response
+	maxRetries := 3
+	// Add retries to avoid failures when creating a user
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		resp, err = u.client.Post(fmt.Sprintf("%s/users", u.baseURL), "application/json", bytes.NewReader(body))
+		if err == nil {
+			break
+		}
+		if attempt < maxRetries {
+			// Simple backoff
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +70,17 @@ func (u *userClient) UpdateUser(id string, user *User) (*User, error) {
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("%s/users/%s", u.baseURL, id), bytes.NewReader(body))
+	var req *http.Request
+	maxRetries := 3
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		req, err = http.NewRequest(http.MethodPut, fmt.Sprintf("%s/users/%s", u.baseURL, id), bytes.NewReader(body))
+		if err == nil {
+			break
+		}
+		if attempt < maxRetries {
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +101,18 @@ func (u *userClient) UpdateUser(id string, user *User) (*User, error) {
 }
 
 func (u *userClient) GetUser(id string) (*User, error) {
-	resp, err := u.client.Get(fmt.Sprintf("%s/users/%s", u.baseURL, id))
+	var resp *http.Response
+	var err error
+	maxRetries := 3
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		resp, err = u.client.Get(fmt.Sprintf("%s/users/%s", u.baseURL, id))
+		if err == nil {
+			break
+		}
+		if attempt < maxRetries {
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
