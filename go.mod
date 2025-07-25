@@ -1,3 +1,3 @@
-module rakuten.com/api-client
+module api-client
 
 go 1.24.4
